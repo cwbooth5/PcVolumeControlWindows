@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Makaretu.Dns;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -17,6 +18,8 @@ namespace VolumeControl
         private List<TcpClient> m_clients = new List<TcpClient>();
         private bool m_running = false;
         private ASCIIEncoding m_encoder = new ASCIIEncoding();
+        private Thread mDNSThread;
+       // private ServiceDiscovery sd;
 
         public Server(ClientListener clientListener, string address, int port)
         {
@@ -26,6 +29,35 @@ namespace VolumeControl
             listenThread.Start();
             m_clientListener = clientListener;
             Console.WriteLine("Server listening on address: {0}:{1}", parsedAddress, port);
+
+            // multicast DNS/service announcement stuff
+           // var sd = new ServiceDiscovery();
+            mDNSThread = new Thread(() => StartMulticastDNS((ushort)port, 5000, parsedAddress));
+            mDNSThread.Start();
+        }
+
+        // Multicast DNS - used to broadcast/announce this server on the LAN for clients.
+        // Broadcasts go out every interface to ipv4/ipv6 multicast addresses.
+        // This sends out a broadcast on all network interfaces.
+        // port is the port number, interval is the number of milliseconds between announcements.
+        public void StartMulticastDNS(ushort port, int interval, IPAddress address)
+        {
+            var service = new ServiceProfile("_pcvolumecontrol", "_pcvolumecontrol._tcp.", port);
+            service.AddProperty("pcvcaddress", address.ToString());
+            service.AddProperty("pcvcport", port.ToString());
+
+            var sd = new ServiceDiscovery();
+    
+            while (isRunning())
+            {
+                sd.Announce(service);
+                Console.WriteLine("mDNS announcing address {0} port {1} every {2} milliseconds...", address, port, interval);
+                System.Threading.Thread.Sleep(interval);
+            }
+            if (!isRunning()){
+                Console.WriteLine("unadvertising all announced mDNS messages");
+                //sd.Unadvertise();
+            }
         }
 
         public bool isRunning()
@@ -38,6 +70,9 @@ namespace VolumeControl
             m_running = false;
 
             m_tcpListener.Stop();
+
+            //sd.Unadvertise(); // graceful exit, we can send the "we're gone now" update on the multicast address
+            //mDNSThread.Abort();
 
             lock ( this )
             {

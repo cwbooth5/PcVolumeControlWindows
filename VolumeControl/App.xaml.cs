@@ -77,9 +77,9 @@ namespace VolumeControl
 
                 // Get an IP to use when starting up
                 string[] addresses = GetLocalIPAddresses();
-                if (addresses.Length < 1)
+                if (addresses.Length < 2)
                 {
-                    MessageBox.Show("ahhh what the fuck.", "PcVolumeControl", MessageBoxButton.OK, MessageBoxImage.Information);
+                    MessageBox.Show("No IPv4 network interfaces found", "PcVolumeControl", MessageBoxButton.OK, MessageBoxImage.Error);
                 } 
                 else
                 {
@@ -265,6 +265,8 @@ namespace VolumeControl
         public void startServer(string address, int port)
         {
             Server = new Server(this, address, port);
+
+
         }
 
         public bool stopServer()
